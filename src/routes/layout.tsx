@@ -1,17 +1,48 @@
 import { component$, Slot } from "@builder.io/qwik";
-import type { RequestHandler } from "@builder.io/qwik-city";
+import { routeLoader$, type RequestHandler } from "@builder.io/qwik-city";
+import { createServerClient } from "supabase-auth-helpers-qwik";
+
+export const useDBTest = routeLoader$(async (requestEv) => {
+  const supabaseClient = createServerClient(
+    requestEv.env.get("PUBLIC_SUPABASE_URL")!,
+    requestEv.env.get("PUBLIC_SUPABASE_ANON_KEY")!,
+    requestEv,
+  );
+  const { data, error } = await supabaseClient.from("test").select("*");
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  return { data };
+});
 
 export const onGet: RequestHandler = async ({ cacheControl }) => {
-  // Control caching for this request for best performance and to reduce hosting costs:
-  // https://qwik.dev/docs/caching/
   cacheControl({
-    // Always serve a cached response by default, up to a week stale
     staleWhileRevalidate: 60 * 60 * 24 * 7,
-    // Max once every 5 seconds, revalidate on the server to get a fresh version of this page
     maxAge: 5,
   });
 };
 
 export default component$(() => {
-  return <Slot />;
+  const dbData = useDBTest();
+  const { data, error } = dbData.value;
+
+  console.log("Rendered data:", data);
+
+  return (
+    <div>
+      <h1>Data from Supabase</h1>
+      {error && <p>Error: {error}</p>}
+      {data ? (
+        <ul>
+          {data.map((item: any, index: number) => (
+            <li key={index}>{item.email}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>Loading...</p>
+      )}
+      <Slot />
+    </div>
+  );
 });
